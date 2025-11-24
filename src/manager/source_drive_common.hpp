@@ -72,7 +72,15 @@ public:
         YamlRead<bool>(       driver_config, "xt_spot_correction",        driver_param.decoder_param.xt_spot_correction, false);
         YamlRead<uint16_t>(   driver_config, "device_udp_src_port",       driver_param.input_param.device_udp_src_port, 0);
         YamlRead<uint16_t>(   driver_config, "device_fault_port",         driver_param.input_param.device_fault_port, 0);
-        
+        // RemakeConfig parameters (NEW for RemakeConfig and grid support)
+        if (driver_config["remake_config"]) {
+            YamlRead<bool>(driver_config["remake_config"], "enabled",
+                           driver_param.decoder_param.remake_config.flag, false);
+            YamlRead<bool>(driver_config["remake_config"], "use_ring_for_vertical",
+                           driver_param.decoder_param.remake_config.use_ring_for_vertical, false);
+            YamlRead<bool>(driver_config["remake_config"], "duplicate_sparse_rings",
+                           driver_param.decoder_param.remake_config.duplicate_sparse_rings, false);
+        }
         // ROS related
         YamlRead<bool>(       config["ros"], "send_packet_ros",            driver_param.input_param.send_packet_ros, false);
         YamlRead<bool>(       config["ros"], "send_point_cloud_ros",       driver_param.input_param.send_point_cloud_ros, false);
