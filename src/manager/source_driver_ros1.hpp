@@ -254,8 +254,16 @@ inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<L
   int fields = 6;
   ros_msg.fields.clear();
   ros_msg.fields.reserve(fields);
-  ros_msg.width = frame.points_num; 
-  ros_msg.height = 1; 
+  // Use grid dimensions if RemakeConfig active
+  if (frame.fParam.remake_config.flag) {
+    auto& rq = frame.fParam.remake_config;
+    int vertical_size = rq.use_ring_for_vertical ? rq.vertical_bins : rq.max_elev_scan;
+    ros_msg.width = rq.max_azi_scan;
+    ros_msg.height = vertical_size;
+  } else {
+    ros_msg.width = frame.points_num;
+    ros_msg.height = 1;
+  }
 
   int offset = 0;
   offset = addPointField(ros_msg, "x", 1, sensor_msgs::PointField::FLOAT32, offset);
