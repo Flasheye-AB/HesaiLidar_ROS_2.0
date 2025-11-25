@@ -91,6 +91,11 @@ lidar:
         certFile: ""                                  # Represents the path of the user's certificate
         privateKeyFile: ""                            # Represents the path of the user's private key 
         caFile: ""                                    # Represents the path of the CA certificate 
+        # RemakeConfig parameters
+        remake_config:
+          enabled: false                      # Enable RemakeConfig
+          use_ring_for_vertical: false        # OT128: ring-based vertical binning
+          duplicate_sparse_rings: false       # OT128: fill sparse ring gaps
 
       pcap_type:
         pcap_path: "Your pcap file"                         # The path of pcap file
@@ -151,6 +156,10 @@ In the configuration file, set `source_type` to `1`, then configure the paramete
 ### Parsing PCAP file
 
 In the configuration file, set `source_type` to `2`, then configure the parameters under `pcap_type`. Generally, you need to configure `pcap_path`, `correction_file_path`, and `firetime_file_path`. For detailed information about `pcap_play_synchronization` and `pcap_play_in_loop` functionality, please refer to the parameter introduction section in the SDK README. Then run start.launch.
+
+### Reording points into a grid - DoRemake
+
+In the configuration file, set `remake_config` `enabled` to `true` to enable reordering the data into a grid of rows and columns using constant angle steps in elevation and azimuth. For the OT128 this grid will be very sparse due to scan density varying with elevation. Enabling `use_ring_for_vertical` will instead use channels for the vertical and give a denser grid. Also enabling `duplicate_sparse_rings` will enable duplicating points in the outer rings were the sampling density is half of the center otherwise leaving empty holes.
 
 ### Record and playback ROSBAG file
 

@@ -1,7 +1,7 @@
 lidar:
   - driver:
       use_gpu: false
-      source_type: 1                                  # The type of data source, 1: real-time lidar connection, 2: pcap, 3: packet rosbag, 4: serial    
+      source_type: 2                                  # The type of data source, 1: real-time lidar connection, 2: pcap, 3: packet rosbag, 4: serial    
       # Depending on the type of source_type, fill in the corresponding configuration block (lidar_udp_type, pcap_type, serial_type)
       lidar_udp_type:
         device_ip_address: 192.168.1.201              # host_ip_address. If empty(""), the source ip of the udp point cloud is used
@@ -26,12 +26,12 @@ lidar:
         caFile: ""                                    # Represents the path of the CA certificate 
 
       pcap_type:
-        pcap_path: "Your pcap file"                         # The path of pcap file
-        correction_file_path: "Your correction file path"   # The path of correction file
-        firetimes_path: "Your firetime file path"           # The path of firetimes file
+        pcap_path: "/home/jf/Work/Flasheye/Hesai/test/hesai_ws/ot128.pcap"
+        correction_file_path: "/home/jf/Work/Flasheye/Hesai/test/hesai_ws/OT128_Angle-Correction-File.csv"
+        firetimes_path: "/home/jf/Work/Flasheye/Hesai/test/hesai_ws/OT128_Firetime-Correction-File.csv"
 
         pcap_play_synchronization: true                     # pcap play rate synchronize with the host time
-        pcap_play_in_loop: false
+        pcap_play_in_loop: true
       
       rosbag_type:
         correction_file_path: "Your correction file path"   # The path of correction file
@@ -64,6 +64,11 @@ lidar:
       xt_spot_correction: false             # Set to TRUE when XT S point cloud layering correction is required
       device_udp_src_port: 0                # Filter point clouds for specified source ports in case of multiple lidar, setting >=1024
       device_fault_port: 0                  # Filter fault message for specified source ports in case of multiple lidar, setting >=1024
+      # NEW: RemakeConfig parameters
+      remake_config:
+        enabled: false                      # Enable RemakeConfig
+        use_ring_for_vertical: true         # OT128: ring-based vertical binning
+        duplicate_sparse_rings: false       # OT128: fill sparse ring gaps
     ros:
       ros_frame_id: hesai_lidar                       # Frame id of packet message and point cloud message
       ros_recv_packet_topic: /lidar_packets           # Topic used to receive lidar packets from rosbag
