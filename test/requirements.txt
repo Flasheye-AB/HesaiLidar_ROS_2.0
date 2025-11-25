@@ -1,0 +1,16 @@
+# Python requirements for ROS2 visualization tools
+# ros2_range_image_viewer.py and ros2_mesh_viewer.py
+
+# Core numerical and visualization
+numpy>=1.21,<2.0
+matplotlib>=3.5.0
+opencv-python>=4.5.0
+
+# 3D visualization (for mesh viewer)
+open3d>=0.16.0
+
+# ROS2 Python libraries (installed via apt, but listed here for reference)
+# These should be available when ROS2 is sourced:
+# - rclpy
+# - sensor_msgs_py
+# - sensor_msgs
