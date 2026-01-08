@@ -66,9 +66,10 @@ lidar:
       device_fault_port: 0                  # Filter fault message for specified source ports in case of multiple lidar, setting >=1024
       # NEW: RemakeConfig parameters
       remake_config:
-        enabled: false                      # Enable RemakeConfig
-        use_ring_for_vertical: false         # OT128: ring-based vertical binning
+        enabled: true                      # Enable RemakeConfig
+        use_ring_for_vertical: true         # OT128: ring-based vertical binning
         duplicate_sparse_rings: false       # OT128: fill sparse ring gaps
+        echo_mode_filter: 1                 # 1=first return, 2=second return
     ros:
       ros_frame_id: hesai_lidar                       # Frame id of packet message and point cloud message
       ros_recv_packet_topic: /lidar_packets           # Topic used to receive lidar packets from rosbag

@@ -80,7 +80,8 @@ public:
                            driver_param.decoder_param.remake_config.use_ring_for_vertical, false);
             YamlRead<bool>(driver_config["remake_config"], "duplicate_sparse_rings",
                            driver_param.decoder_param.remake_config.duplicate_sparse_rings, false);
-        }
+            YamlRead<int>(driver_config["remake_config"], "echo_mode_filter",
+                          driver_param.decoder_param.echo_mode_filter, 0);        }
         // ROS related
         YamlRead<bool>(       config["ros"], "send_packet_ros",            driver_param.input_param.send_packet_ros, false);
         YamlRead<bool>(       config["ros"], "send_point_cloud_ros",       driver_param.input_param.send_point_cloud_ros, false);
