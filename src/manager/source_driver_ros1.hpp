@@ -247,6 +247,108 @@ inline void SourceDriver::SendImuConfig(const LidarImuData& msg)
   imu_pub_.publish(ToRosMsg(msg));
 }
 
+#define NO_USE_SUB_SAMPLING_FOR_TEST
+#ifdef USE_SUB_SAMPLING_FOR_TEST
+
+// Subsampling constants - set to 1 for no subsampling (compiler optimizes away)
+static constexpr int kSubsampleX = 4;  // Azimuth: 1=full, 2=half, 4=quarter
+static constexpr int kSubsampleY = 2;  // Elevation: 1=full, 2=half
+
+inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<LidarPointXYZIRT>& frame, const std::string& frame_id)
+{
+  sensor_msgs::PointCloud2 ros_msg;
+
+  int fields = 6;
+  ros_msg.fields.clear();
+  ros_msg.fields.reserve(fields);
+
+  // Determine source grid dimensions
+  int src_width, src_height;
+  if (frame.fParam.remake_config.flag) {
+    auto& rq = frame.fParam.remake_config;
+    src_width = rq.max_azi_scan;
+    src_height = rq.use_ring_for_vertical ? rq.vertical_bins : rq.max_elev_scan;
+  } else {
+    src_width = frame.points_num;
+    src_height = 1;
+  }
+
+  // Calculate output dimensions with subsampling
+  int out_width = (kSubsampleX > 1) ? (src_width / kSubsampleX) : src_width;
+  int out_height = (kSubsampleY > 1) ? (src_height / kSubsampleY) : src_height;
+  ros_msg.width = out_width;
+  ros_msg.height = out_height;
+
+  int offset = 0;
+  offset = addPointField(ros_msg, "x", 1, sensor_msgs::PointField::FLOAT32, offset);
+  offset = addPointField(ros_msg, "y", 1, sensor_msgs::PointField::FLOAT32, offset);
+  offset = addPointField(ros_msg, "z", 1, sensor_msgs::PointField::FLOAT32, offset);
+  offset = addPointField(ros_msg, "intensity", 1, sensor_msgs::PointField::FLOAT32, offset);
+  offset = addPointField(ros_msg, "ring", 1, sensor_msgs::PointField::UINT16, offset);
+  offset = addPointField(ros_msg, "timestamp", 1, sensor_msgs::PointField::FLOAT64, offset);
+
+  ros_msg.point_step = offset;
+  ros_msg.row_step = ros_msg.width * ros_msg.point_step;
+  ros_msg.is_dense = false;
+  ros_msg.data.resize(out_width * out_height * ros_msg.point_step);
+
+  sensor_msgs::PointCloud2Iterator<float> iter_x_(ros_msg, "x");
+  sensor_msgs::PointCloud2Iterator<float> iter_y_(ros_msg, "y");
+  sensor_msgs::PointCloud2Iterator<float> iter_z_(ros_msg, "z");
+  sensor_msgs::PointCloud2Iterator<float> iter_intensity_(ros_msg, "intensity");
+  sensor_msgs::PointCloud2Iterator<uint16_t> iter_ring_(ros_msg, "ring");
+  sensor_msgs::PointCloud2Iterator<double> iter_timestamp_(ros_msg, "timestamp");
+
+  // Copy points with subsampling
+  if (kSubsampleX == 1 && kSubsampleY == 1) {
+    // No subsampling - original fast path
+    for (size_t i = 0; i < frame.points_num; i++) {
+      LidarPointXYZIRT point = frame.points[i];
+      *iter_x_ = point.x;
+      *iter_y_ = point.y;
+      *iter_z_ = point.z;
+      *iter_intensity_ = point.intensity;
+      *iter_ring_ = point.ring;
+      *iter_timestamp_ = point.timestamp;
+      ++iter_x_; ++iter_y_; ++iter_z_;
+      ++iter_intensity_; ++iter_ring_; ++iter_timestamp_;
+    }
+  } else {
+    // Subsampled copy - iterate over output grid
+    for (int row = 0; row < out_height; row++) {
+      for (int col = 0; col < out_width; col++) {
+        int src_row = row * kSubsampleY;
+        int src_col = col * kSubsampleX;
+        int src_idx = src_row * src_width + src_col;
+        LidarPointXYZIRT point = frame.points[src_idx];
+        *iter_x_ = point.x;
+        *iter_y_ = point.y;
+        *iter_z_ = point.z;
+        *iter_intensity_ = point.intensity;
+        *iter_ring_ = point.ring;
+        *iter_timestamp_ = point.timestamp;
+        ++iter_x_; ++iter_y_; ++iter_z_;
+        ++iter_intensity_; ++iter_ring_; ++iter_timestamp_;
+      }
+    }
+  }
+
+  printf("frame:%d points:%ux%u packet:%d start time:%lf end time:%lf\n",
+         frame.frame_index, out_width, out_height, frame.packet_num,
+         frame.points[0].timestamp, frame.points[frame.points_num - 1].timestamp);
+
+  int64_t sec = static_cast<int64_t>(frame.points[0].timestamp);
+  if (sec <= std::numeric_limits<int32_t>::max()) {
+    ros_msg.header.stamp = ros::Time().fromSec(frame.points[0].timestamp);
+  } else {
+    printf("ros1 does not support timestamps greater than 19 January 2038 03:14:07 (now %lf)\n", frame.points[0].timestamp);
+  }
+  ros_msg.header.frame_id = frame_id_;
+  return ros_msg;
+}
+
+#else
+
 inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<LidarPointXYZIRT>& frame, const std::string& frame_id)
 {
   sensor_msgs::PointCloud2 ros_msg;
@@ -311,6 +413,8 @@ inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<L
   ros_msg.header.frame_id = frame_id_;
   return ros_msg;
 }
+
+#endif
 
 inline hesai_ros_driver::UdpFrame SourceDriver::ToRosMsg(const UdpFrame_t& ros_msg, double timestamp) {
   hesai_ros_driver::UdpFrame rs_msg;
