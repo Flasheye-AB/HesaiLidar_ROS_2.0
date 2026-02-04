@@ -74,3 +74,36 @@ Monday June 30rd, 2025 17:28:15
 3. Modify the config.yaml configuration table, configure different data sources through source_type, and fill in the corresponding configuration items
 4. send_imu_ros controls whether IMU data registers callback functions and whether to publish IMU data
 5. Support jazzy version, support install
+
+################################################################################
+Tuesday November 25th, 2025
+## version
+preliminary
+
+## modify
+1. Updated to support DoRemake and return point cloud organized in rows and columns
+2. Works with updated SDK module with dense organized point cloud for OT128
+3. Defaults to not use DoRemake. Set in config/config.yaml
+
+################################################################################
+February 2025 (Flasheye modifications)
+## version
+??
+
+## modify
+1. RemakeConfig support: Output point cloud as organized grid (height x width) instead 
+   of unordered sequence (height=1). Required for range binning segmentation.
+2. OT128 ring-based vertical binning: Dense 128-row grid using ring index instead of 
+   sparse 320-row grid from elevation angles.
+3. Optional sparse ring duplication for OT128: Fills horizontal gaps in outer rings (0-23, 88-127).
+4. echo_mode_filter config option: Filter dual returns to single return mode.
+   0=all returns, 1=first return only, 2=second return only.
+5. Test/debug feature, requires compile time define: Subsampling support in ToRosMsg: Compile-time constants kSubsampleX/kSubsampleY 
+   for reducing output resolution during testing. Set USE_SUB_SAMPLING_FOR_TEST to enable.
+
+## config.yaml options
+remake_config:
+  enabled: true                    # Enable ordered grid output
+  use_ring_for_vertical: true      # OT128: use ring index for vertical axis
+  duplicate_sparse_rings: false     # OT128: fill gaps in sparse rings
+  echo_mode_filter: 1              # 0=all, 1=first, 2=second return
