@@ -7,7 +7,7 @@ project(hesai_ros_driver)
 #=======================================
 set(VERSION_MAJOR 2)
 set(VERSION_MINOR 0)
-set(VERSION_TINY  10)
+set(VERSION_TINY  11)
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/Version.h.in"
   "${CMAKE_CURRENT_BINARY_DIR}/Version.h"
@@ -59,7 +59,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "")
   add_definitions(-O3)
 endif()
 
-if(($ENV{ROS_DISTRO} STREQUAL "jazzy"))
+if(($ENV{ROS_DISTRO} STREQUAL "kilted"))
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+elseif(($ENV{ROS_DISTRO} STREQUAL "jazzy"))
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 elseif($ENV{ROS_DISTRO} STREQUAL "humble")  # the ros2 humble requires c++17
@@ -177,12 +180,21 @@ set(LIB_TARGETS
     hesai_sdk_lib
     log_lib
     lidar_lib
+    ptcClient_lib
+    source_lib
+    platutils_lib
+    serialClient_lib
+    udpParser_lib
     )
 
 if(${CUDA_FOUND})
   add_executable(hesai_ros_driver_node
     node/hesai_ros_driver_node.cu
     src/manager/node_manager.cc
+    )
+  set(LIB_TARGETS
+    ${LIB_TARGETS}
+    udpParserGpu_lib
     )
 else()
   add_executable(hesai_ros_driver_node
@@ -233,7 +245,7 @@ if($ENV{ROS_VERSION} MATCHES "2")
   # "tf2_geometry_msgs"
   )
 
-if(($ENV{ROS_DISTRO} STREQUAL "jazzy") OR ($ENV{ROS_DISTRO} STREQUAL "humble"))
+if(($ENV{ROS_DISTRO} STREQUAL "kilted") OR ($ENV{ROS_DISTRO} STREQUAL "jazzy") OR ($ENV{ROS_DISTRO} STREQUAL "humble"))
   rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
   target_link_libraries(hesai_ros_driver_node "${cpp_typesupport_target}")
 else()
