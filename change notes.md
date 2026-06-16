@@ -1,5 +1,17 @@
 # HesaiLidar_ROS_2.0
 
+## V2.0.12-Flasheye (DEV-2232)
+
+### Friday June 5th, 2026
+
+## Added
+1. Optional ordered (organized, row-major) point cloud output for range-binning segmentation,
+   enabled via `remake_config` in config.yaml (`enabled`, `use_ring_remake`). When enabled,
+   `ToRosMsg()` publishes an organized PointCloud2 (height = laser/ring count from `frame.laser_num`,
+   width = azimuth), transposing the SDK's column-major grid to row-major. Implemented in the ROS
+   wrapper only (ROS1 + ROS2); the SDK is unmodified. Disabled by default — output is then the stock
+   unordered cloud (height = 1). Verified on OT128 (128x3600); FTX (protocol 7.3) not tested but should work.
+
 ## V2.0.12
 
 ### Monday April 27th, 2026 20:47:57

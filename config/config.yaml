@@ -76,6 +76,10 @@ lidar:
       default_frame_frequency: 10.0         # The default frequency that point cloud sends.
       echo_mode_filter: 0                   # return mode filter
 
+      remake_config:
+        enabled: true
+        use_ring_remake: true
+
     ros:
       ros_frame_id: hesai_lidar                           # Frame id of packet message and point cloud message
       ros_recv_packet_topic: /lidar_packets               # Topic used to receive lidar packets from rosbag
