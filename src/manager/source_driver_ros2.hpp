@@ -267,8 +267,32 @@ inline sensor_msgs::msg::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFr
   int fields = 6;
   ros_msg.fields.clear();
   ros_msg.fields.reserve(fields);
-  ros_msg.width = points_number; 
-  ros_msg.height = 1; 
+  // ros_msg.width = points_number; 
+  // ros_msg.height = 1; 
+  // DEV-2232
+  const RemakeConfig& remake = frame.fParam.remake_config;
+  const bool ordered = remake.flag;
+  // Layout of frame.points and the shape we publish.
+  //   Unordered (stock):  a flat list of points, published as a single row.
+  //   Ordered (remake):   a column-major grid. max_elev_scan is the number of source rows
+  //                       per azimuth column = the stride used to read frame.points. In ring
+  //                       mode only the first laser_num of those rows are real laser channels
+  //                       (max_elev_scan is the larger angle-grid height, e.g. OT128: 320
+  //                       stride vs 128 channels), so we publish laser_num rows.
+  int row_stride = 1;
+  int out_height = 1;
+  int out_width  = (int)points_number;
+  if (ordered) {
+    row_stride = remake.max_elev_scan;
+    out_width  = remake.max_azi_scan;
+    if (remake.use_ring_remake) {
+      out_height = frame.laser_num;        // one row per laser channel
+    } else {
+      out_height = remake.max_elev_scan;   // one row per elevation-angle bin
+    }
+  }
+  ros_msg.width  = out_width;
+  ros_msg.height = out_height;
 
   int offset = 0;
   offset = addPointField(ros_msg, "x", 1, sensor_msgs::msg::PointField::FLOAT32, offset);
@@ -281,7 +305,8 @@ inline sensor_msgs::msg::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFr
   ros_msg.point_step = offset;
   ros_msg.row_step = ros_msg.width * ros_msg.point_step;
   ros_msg.is_dense = false;
-  ros_msg.data.resize(points_number * ros_msg.point_step);
+  // DEV-2232
+  ros_msg.data.resize(out_height * out_width * ros_msg.point_step);
 
   sensor_msgs::PointCloud2Iterator<float> iter_x_(ros_msg, "x");
   sensor_msgs::PointCloud2Iterator<float> iter_y_(ros_msg, "y");
@@ -289,21 +314,43 @@ inline sensor_msgs::msg::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFr
   sensor_msgs::PointCloud2Iterator<float> iter_intensity_(ros_msg, "intensity");
   sensor_msgs::PointCloud2Iterator<uint16_t> iter_ring_(ros_msg, "ring");
   sensor_msgs::PointCloud2Iterator<double> iter_timestamp_(ros_msg, "timestamp");
-  for (size_t i = 0; i < points_number; i++)
-  {
-    LidarPointXYZIRT point = pPoints[i];
-    *iter_x_ = point.x;
-    *iter_y_ = point.y;
-    *iter_z_ = point.z;
-    *iter_intensity_ = point.intensity;
-    *iter_ring_ = point.ring;
-    *iter_timestamp_ = point.timestamp;
-    ++iter_x_;
-    ++iter_y_;
-    ++iter_z_;
-    ++iter_intensity_;
-    ++iter_ring_;
-    ++iter_timestamp_;   
+  // DEV-2232
+  if (!ordered) {
+    for (size_t i = 0; i < points_number; i++)
+    {
+      LidarPointXYZIRT point = pPoints[i];
+      *iter_x_ = point.x;
+      *iter_y_ = point.y;
+      *iter_z_ = point.z;
+      *iter_intensity_ = point.intensity;
+      *iter_ring_ = point.ring;
+      *iter_timestamp_ = point.timestamp;
+      ++iter_x_;
+      ++iter_y_;
+      ++iter_z_;
+      ++iter_intensity_;
+      ++iter_ring_;
+      ++iter_timestamp_;   
+    }
+  } else {
+    // Copy and change column order to row order in one go
+    for (int row = 0; row < out_height; row++) {
+      for (int col = 0; col < out_width; col++) {
+        LidarPointXYZIRT point = pPoints[col * row_stride + row];
+        *iter_x_ = point.x;
+        *iter_y_ = point.y;
+        *iter_z_ = point.z;
+        *iter_intensity_ = point.intensity;
+        *iter_ring_ = point.ring;
+        *iter_timestamp_ = point.timestamp;
+        ++iter_x_;
+        ++iter_y_;
+        ++iter_z_;
+        ++iter_intensity_;
+        ++iter_ring_;
+        ++iter_timestamp_;   
+      }
+    }
   }
   // printf("HesaiLidar Runing Status [standby mode:%u]  |  [speed:%u]\n", frame.work_mode, frame.spin_speed);
   printf("%s frame:%d points:%u packet:%d start time:%lf end time:%lf\n", prefix, frame_index, points_number, packet_number, frame_start_timestamp, frame_end_timestamp) ;

@@ -81,6 +81,11 @@ public:
         YamlRead<float>(      driver_config, "frame_frequency",           driver_param.decoder_param.frame_frequency, 0);
         YamlRead<float>(      driver_config, "default_frame_frequency",   driver_param.decoder_param.default_frame_frequency, 10);
         YamlRead<uint16_t>(   driver_config, "echo_mode_filter",          driver_param.decoder_param.echo_mode_filter, 0);
+        // --- Flasheye DEV-2232: ordered/organized grid (remake) ---
+        YamlRead<bool>(driver_config["remake_config"], "enabled",         driver_param.decoder_param.remake_config.flag,            false);
+        YamlRead<bool>(driver_config["remake_config"], "use_ring_remake", driver_param.decoder_param.remake_config.use_ring_remake, false);
+
+
         // Do not use YamlRead<uint8_t>, Yaml cannot recognise uint8_t, There will be some unexpected values.
 
         // ROS related
