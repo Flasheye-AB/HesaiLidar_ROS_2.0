@@ -2,6 +2,26 @@
 
 ## Flasheye
 
+### Sync with upstream v2.0.12
+
+## Changed
+1. Merged upstream HesaiLidar_ROS_2.0 v2.0.12. SDK submodule updated to upstream v2.0.12.
+2. Point cloud rearrangement now uses upstream v2.0.12's angle-based remake instead of the
+   earlier Flasheye ring-based binning. Ordered grid dimensions come from the SDK per-model
+   defaults (OT128: 3600 x 320 = azimuth x elevation-angle bins).
+
+## Removed
+1. OT128 ring-based vertical binning (`use_ring_for_vertical`, `vertical_bins`) — superseded
+   by upstream's remake. OT128 grid is now the 3600 x 320 elevation-angle grid.
+2. Sparse ring duplication for OT128 (`duplicate_sparse_rings`).
+
+### config.yaml options
+```
+remake_config:
+  enabled: true                    # Enable ordered grid output (upstream angle-based remake)
+  echo_mode_filter: 1              # 0=all, 1=first, 2=second return
+```
+
 ### February 2025
 
 ## Added

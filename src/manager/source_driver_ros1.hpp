@@ -280,7 +280,7 @@ inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<L
   if (frame.fParam.remake_config.flag) {
     auto& rq = frame.fParam.remake_config;
     src_width = rq.max_azi_scan;
-    src_height = rq.use_ring_for_vertical ? rq.vertical_bins : rq.max_elev_scan;
+    src_height = rq.max_elev_scan;
   } else {
     src_width = frame.points_num;
     src_height = 1;
@@ -372,9 +372,8 @@ inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<L
   // Use grid dimensions if RemakeConfig active
   if (frame.fParam.remake_config.flag) {
     auto& rq = frame.fParam.remake_config;
-    int vertical_size = rq.use_ring_for_vertical ? rq.vertical_bins : rq.max_elev_scan;
     ros_msg.width = rq.max_azi_scan;
-    ros_msg.height = vertical_size;
+    ros_msg.height = rq.max_elev_scan;
   } else {
     ros_msg.width = points_number;
     ros_msg.height = 1;

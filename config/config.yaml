@@ -76,9 +76,9 @@ lidar:
       default_frame_frequency: 10.0         # The default frequency that point cloud sends.
       echo_mode_filter: 0                   # return mode filter
       remake_config:
-        enabled: true                      # Enable RemakeConfig
-        use_ring_for_vertical: true         # OT128: ring-based vertical binning
-        duplicate_sparse_rings: false       # OT128: fill sparse ring gaps
+        enabled: true                      # Enable ordered grid output (upstream v2.0.12 angle-based remake).
+                                           # Grid dimensions use the SDK per-model defaults
+                                           # (OT128: 3600 x 320 = azimuth x elevation-angle bins).
         echo_mode_filter: 1                 # 1=first return, 2=second return
 
     ros:
