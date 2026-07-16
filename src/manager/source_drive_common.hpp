@@ -78,20 +78,17 @@ public:
         YamlRead<std::string>(driver_config, "multi_fov_filter_ranges",   driver_param.decoder_param.multi_fov_filter_ranges, "");
         YamlRead<uint16_t>(   driver_config, "device_udp_src_port",       driver_param.input_param.device_udp_src_port, 0);
         YamlRead<uint16_t>(   driver_config, "device_fault_port",         driver_param.input_param.device_fault_port, 0);
-
         YamlRead<float>(      driver_config, "frame_frequency",           driver_param.decoder_param.frame_frequency, 0);
         YamlRead<float>(      driver_config, "default_frame_frequency",   driver_param.decoder_param.default_frame_frequency, 10);
         YamlRead<uint16_t>(   driver_config, "echo_mode_filter",          driver_param.decoder_param.echo_mode_filter, 0);
         // Do not use YamlRead<uint8_t>, Yaml cannot recognise uint8_t, There will be some unexpected values.
 
-        // RemakeConfig parameters (NEW for RemakeConfig and grid support)
+        // RemakeConfig parameters (upstream v2.0.12 angle-based remake).
+        // Ordered grid output uses the SDK's per-model defaults
+        // (OT128: max_azi_scan=3600 x max_elev_scan=320).
         if (driver_config["remake_config"]) {
             YamlRead<bool>(driver_config["remake_config"], "enabled",
                            driver_param.decoder_param.remake_config.flag, false);
-            YamlRead<bool>(driver_config["remake_config"], "use_ring_for_vertical",
-                           driver_param.decoder_param.remake_config.use_ring_for_vertical, false);
-            YamlRead<bool>(driver_config["remake_config"], "duplicate_sparse_rings",
-                           driver_param.decoder_param.remake_config.duplicate_sparse_rings, false);
             YamlRead<uint16_t>(driver_config["remake_config"], "echo_mode_filter",
                           driver_param.decoder_param.echo_mode_filter, 0);        
         }
@@ -107,9 +104,9 @@ public:
         YamlRead<std::string>(config["ros"], "ros_send_packet_loss_topic", driver_param.input_param.ros_send_packet_loss_topic, NULL_TOPIC);
         YamlRead<std::string>(config["ros"], "ros_send_ptp_topic",         driver_param.input_param.ros_send_ptp_topic, NULL_TOPIC);
         YamlRead<std::string>(config["ros"], "ros_send_correction_topic",  driver_param.input_param.ros_send_correction_topic, NULL_TOPIC);
-        YamlRead<std::string>(config["ros"], "ros_send_firetime_topic",    driver_param.input_param.ros_send_firetime_topic, NULL_TOPIC);
         YamlRead<std::string>(config["ros"], "ros_recv_correction_topic",  driver_param.input_param.ros_recv_correction_topic, NULL_TOPIC);  
-        YamlRead<std::string>(config["ros"], "ros_send_imu_topic",         driver_param.input_param.ros_send_imu_topic, NULL_TOPIC);              
+        YamlRead<std::string>(config["ros"], "ros_send_imu_topic",         driver_param.input_param.ros_send_imu_topic, NULL_TOPIC);  
+        YamlRead<std::string>(config["ros"], "ros_send_every_packet_topic",driver_param.input_param.ros_send_every_packet_topic, NULL_TOPIC);            
         return true;
     }
 
