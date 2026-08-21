@@ -83,16 +83,6 @@ public:
         YamlRead<uint16_t>(   driver_config, "echo_mode_filter",          driver_param.decoder_param.echo_mode_filter, 0);
         // Do not use YamlRead<uint8_t>, Yaml cannot recognise uint8_t, There will be some unexpected values.
 
-        // RemakeConfig parameters (upstream v2.0.12 angle-based remake).
-        // Ordered grid output uses the SDK's per-model defaults
-        // (OT128: max_azi_scan=3600 x max_elev_scan=320).
-        if (driver_config["remake_config"]) {
-            YamlRead<bool>(driver_config["remake_config"], "enabled",
-                           driver_param.decoder_param.remake_config.flag, false);
-            YamlRead<uint16_t>(driver_config["remake_config"], "echo_mode_filter",
-                          driver_param.decoder_param.echo_mode_filter, 0);        
-        }
-
         // ROS related
         YamlRead<bool>(       config["ros"], "send_packet_ros",            driver_param.input_param.send_packet_ros, false);
         YamlRead<bool>(       config["ros"], "send_point_cloud_ros",       driver_param.input_param.send_point_cloud_ros, false);
