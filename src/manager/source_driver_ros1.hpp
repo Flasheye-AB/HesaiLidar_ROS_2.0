@@ -58,6 +58,8 @@ public:
     spinner.spin();
   }
   std::shared_ptr<HesaiLidarSdk<LidarPointXYZIRT>> driver_ptr_;
+  // Write config to log once for easier debugging
+  bool logged_config_ = false;
 protected:
   // Save Correction file subscribed by "ros_recv_correction_topic"
   void ReceiveCorrection(const std_msgs::UInt8MultiArray& msg);
@@ -295,6 +297,23 @@ inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<L
   }
   ros_msg.width  = out_width;
   ros_msg.height = out_height;
+  // DEV-2505: report the configuration once, now that is has been set.
+  if (!logged_config_) {
+    logged_config_ = true;
+    LogInfo("[flasheye] lasers=%u grid=%dx%d mode=%s azi_scan=%d elev_scan=%d echo_filter=%u timestamp_type=%u",
+            (unsigned)frame.laser_num, out_height, out_width,
+            ordered ? (remake.use_ring_remake ? "ring" : "elevation-angle") : "unordered",
+            remake.max_azi_scan, remake.max_elev_scan,
+            (unsigned)frame.fParam.echo_mode_filter,
+            (unsigned)frame.fParam.use_timestamp_type);
+    bool corr = driver_ptr_ && driver_ptr_->lidar_ptr_
+                && driver_ptr_->lidar_ptr_->GetGeneralParser()
+                && driver_ptr_->lidar_ptr_->GetGeneralParser()->isSetCorrectionSucc();
+    if (!corr) {
+      LogError("[flasheye] no angle correction loaded. Cloud will be flat and angle-based remake fail "
+               "Set angle_correction_path, or connect PTC.");
+    }
+  }
 
   int offset = 0;
   offset = addPointField(ros_msg, "x", 1, sensor_msgs::PointField::FLOAT32, offset);
@@ -344,7 +363,8 @@ inline sensor_msgs::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFrame<L
   }
   // END
 
-  printf("%s frame:%d points:%u packet:%d start time:%lf end time:%lf\n", prefix, frame_index, points_number, packet_number, frame_start_timestamp, frame_end_timestamp) ;
+  // DEV-2505: Spamming the log. Only enable for debugging.
+  // printf("%s frame:%d points:%u packet:%d start time:%lf end time:%lf\n", prefix, frame_index, points_number, packet_number, frame_start_timestamp, frame_end_timestamp) ;
   // ros_msg.header.seq = s;
   int64_t sec = static_cast<int64_t>(frame_start_timestamp);  
   if (sec <= std::numeric_limits<int32_t>::max()) {
