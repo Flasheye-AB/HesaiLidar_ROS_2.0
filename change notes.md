@@ -1,56 +1,16 @@
 # HesaiLidar_ROS_2.0
 
-## Flasheye
+## V2.0.12-Flasheye (DEV-2232)
 
-### Sync with upstream v2.0.12
-
-## Changed
-1. Merged upstream HesaiLidar_ROS_2.0 v2.0.12. SDK submodule updated to upstream v2.0.12.
-2. Point cloud rearrangement now uses upstream v2.0.12's angle-based remake instead of the
-   earlier Flasheye ring-based binning. Ordered grid dimensions come from the SDK per-model
-   defaults (OT128: 3600 x 320 = azimuth x elevation-angle bins).
-
-## Removed
-1. OT128 ring-based vertical binning (`use_ring_for_vertical`, `vertical_bins`) — superseded
-   by upstream's remake. OT128 grid is now the 3600 x 320 elevation-angle grid.
-2. Sparse ring duplication for OT128 (`duplicate_sparse_rings`).
-
-### config.yaml options
-```
-remake_config:
-  enabled: true                    # Enable ordered grid output (upstream angle-based remake)
-  echo_mode_filter: 1              # 0=all, 1=first, 2=second return
-```
-
-### February 2025
+### Friday June 5th, 2026
 
 ## Added
-1. RemakeConfig support: Output point cloud as organized grid (height x width) instead
-   of unordered sequence (height=1). Required for range binning segmentation.
-2. OT128 ring-based vertical binning: Dense 128-row grid using ring index instead of
-   sparse 320-row grid from elevation angles.
-3. Optional sparse ring duplication for OT128: Fills horizontal gaps in outer rings (0-23, 88-127).
-4. `echo_mode_filter` config option: Filter dual returns to single return mode.
-   0=all returns, 1=first return only, 2=second return only.
-5. Test/debug feature, requires compile time define: Subsampling support in ToRosMsg: Compile-time
-   constants kSubsampleX/kSubsampleY for reducing output resolution during testing.
-   Set USE_SUB_SAMPLING_FOR_TEST to enable.
-
-### config.yaml options
-```
-remake_config:
-  enabled: true                    # Enable ordered grid output
-  use_ring_for_vertical: true      # OT128: use ring index for vertical axis
-  duplicate_sparse_rings: false    # OT128: fill gaps in sparse rings
-  echo_mode_filter: 1              # 0=all, 1=first, 2=second return
-```
-
-### Tuesday November 25th, 2025
-
-## Added
-1. Updated to support DoRemake and return point cloud organized in rows and columns.
-2. Works with updated SDK module with dense organized point cloud for OT128.
-3. Defaults to not use DoRemake. Set in config/config.yaml.
+1. Optional ordered (organized, row-major) point cloud output for range-binning segmentation,
+   enabled via `remake_config` in config.yaml (`enabled`, `use_ring_remake`). When enabled,
+   `ToRosMsg()` publishes an organized PointCloud2 (height = laser/ring count from `frame.laser_num`,
+   width = azimuth), transposing the SDK's column-major grid to row-major. Implemented in the ROS
+   wrapper only (ROS1 + ROS2); the SDK is unmodified. Disabled by default — output is then the stock
+   unordered cloud (height = 1). Verified on OT128 (128x3600); FTX (protocol 7.3) not tested but should work.
 
 ## V2.0.12
 

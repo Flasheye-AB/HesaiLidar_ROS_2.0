@@ -81,17 +81,14 @@ public:
         YamlRead<float>(      driver_config, "frame_frequency",           driver_param.decoder_param.frame_frequency, 0);
         YamlRead<float>(      driver_config, "default_frame_frequency",   driver_param.decoder_param.default_frame_frequency, 10);
         YamlRead<uint16_t>(   driver_config, "echo_mode_filter",          driver_param.decoder_param.echo_mode_filter, 0);
-        // Do not use YamlRead<uint8_t>, Yaml cannot recognise uint8_t, There will be some unexpected values.
+        // --- Flasheye DEV-2232: ordered/organized grid (remake) ---
+        YamlRead<bool>(driver_config["remake_config"], "enabled",         driver_param.decoder_param.remake_config.flag,            false);
+        // Ring binning defaults ON if parameter not set. Both false and true overrides possible in config\n'
+        // Ring binning gives a 1-1 mapping between mesurements and grid meausrements
+        // Angle binning needs a sparse grid with many empties, and still throw away many poinst (up to 40% for some sensors)
+        YamlRead<bool>(driver_config["remake_config"], "use_ring_remake", driver_param.decoder_param.remake_config.use_ring_remake, true);
 
-        // RemakeConfig parameters (upstream v2.0.12 angle-based remake).
-        // Ordered grid output uses the SDK's per-model defaults
-        // (OT128: max_azi_scan=3600 x max_elev_scan=320).
-        if (driver_config["remake_config"]) {
-            YamlRead<bool>(driver_config["remake_config"], "enabled",
-                           driver_param.decoder_param.remake_config.flag, false);
-            YamlRead<uint16_t>(driver_config["remake_config"], "echo_mode_filter",
-                          driver_param.decoder_param.echo_mode_filter, 0);        
-        }
+        // Do not use YamlRead<uint8_t>, Yaml cannot recognise uint8_t, There will be some unexpected values.
 
         // ROS related
         YamlRead<bool>(       config["ros"], "send_packet_ros",            driver_param.input_param.send_packet_ros, false);

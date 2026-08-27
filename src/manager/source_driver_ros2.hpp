@@ -63,6 +63,8 @@ public:
   void SpinRos2(){rclcpp::spin(this->node_ptr_);}
   std::shared_ptr<rclcpp::Node> node_ptr_;
   std::shared_ptr<HesaiLidarSdk<LidarPointXYZIRT>> driver_ptr_;
+  // Write config to log once for easier debugging
+  bool logged_config_ = false;
 protected:
   // Save Correction file subscribed by "ros_recv_correction_topic"
   void ReceiveCorrection(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
@@ -267,14 +269,49 @@ inline sensor_msgs::msg::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFr
   int fields = 6;
   ros_msg.fields.clear();
   ros_msg.fields.reserve(fields);
-  // Use grid dimensions if RemakeConfig active
-  if (frame.fParam.remake_config.flag) {
-    auto& rq = frame.fParam.remake_config;
-    ros_msg.width = rq.max_azi_scan;
-    ros_msg.height = rq.max_elev_scan;
-  } else {
-    ros_msg.width = points_number;
-    ros_msg.height = 1;
+  // ros_msg.width = points_number; 
+  // ros_msg.height = 1; 
+  // DEV-2232
+  const RemakeConfig& remake = frame.fParam.remake_config;
+  const bool ordered = remake.flag;
+  // Layout of frame.points and the shape we publish.
+  //   Unordered (stock):  a flat list of points, published as a single row.
+  //   Ordered (remake):   a column-major grid. max_elev_scan is the number of source rows
+  //                       per azimuth column = the stride used to read frame.points. In ring
+  //                       mode only the first laser_num of those rows are real laser channels
+  //                       (max_elev_scan is the larger angle-grid height, e.g. OT128: 320
+  //                       stride vs 128 channels), so we publish laser_num rows.
+  int row_stride = 1;
+  int out_height = 1;
+  int out_width  = (int)points_number;
+  if (ordered) {
+    row_stride = remake.max_elev_scan;
+    out_width  = remake.max_azi_scan;
+    if (remake.use_ring_remake) {
+      out_height = frame.laser_num;        // one row per laser channel
+    } else {
+      out_height = remake.max_elev_scan;   // one row per elevation-angle bin
+    }
+  }
+  ros_msg.width  = out_width;
+  ros_msg.height = out_height;
+
+  // DEV-2505: report the configuration once, now that is has been set.
+  if (!logged_config_) {
+    logged_config_ = true;
+    LogInfo("[flasheye] lasers=%u grid=%dx%d mode=%s azi_scan=%d elev_scan=%d echo_filter=%u timestamp_type=%u",
+            (unsigned)frame.laser_num, out_height, out_width,
+            ordered ? (remake.use_ring_remake ? "ring" : "elevation-angle") : "unordered",
+            remake.max_azi_scan, remake.max_elev_scan,
+            (unsigned)frame.fParam.echo_mode_filter,
+            (unsigned)frame.fParam.use_timestamp_type);
+    bool corr = driver_ptr_ && driver_ptr_->lidar_ptr_
+                && driver_ptr_->lidar_ptr_->GetGeneralParser()
+                && driver_ptr_->lidar_ptr_->GetGeneralParser()->isSetCorrectionSucc();
+    if (!corr) {
+      LogError("[flasheye] no angle correction loaded. Cloud will be flat and angle-based remake fail "
+               "Set angle_correction_path, or connect PTC.");
+    }
   }
 
   int offset = 0;
@@ -288,7 +325,8 @@ inline sensor_msgs::msg::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFr
   ros_msg.point_step = offset;
   ros_msg.row_step = ros_msg.width * ros_msg.point_step;
   ros_msg.is_dense = false;
-  ros_msg.data.resize(points_number * ros_msg.point_step);
+  // DEV-2232
+  ros_msg.data.resize(out_height * out_width * ros_msg.point_step);
 
   sensor_msgs::PointCloud2Iterator<float> iter_x_(ros_msg, "x");
   sensor_msgs::PointCloud2Iterator<float> iter_y_(ros_msg, "y");
@@ -296,25 +334,48 @@ inline sensor_msgs::msg::PointCloud2 SourceDriver::ToRosMsg(const LidarDecodedFr
   sensor_msgs::PointCloud2Iterator<float> iter_intensity_(ros_msg, "intensity");
   sensor_msgs::PointCloud2Iterator<uint16_t> iter_ring_(ros_msg, "ring");
   sensor_msgs::PointCloud2Iterator<double> iter_timestamp_(ros_msg, "timestamp");
-  for (size_t i = 0; i < points_number; i++)
-  {
-    LidarPointXYZIRT point = pPoints[i];
-    *iter_x_ = point.x;
-    *iter_y_ = point.y;
-    *iter_z_ = point.z;
-    *iter_intensity_ = point.intensity;
-    *iter_ring_ = point.ring;
-    *iter_timestamp_ = point.timestamp;
-    ++iter_x_;
-    ++iter_y_;
-    ++iter_z_;
-    ++iter_intensity_;
-    ++iter_ring_;
-    ++iter_timestamp_;   
+  // DEV-2232
+  if (!ordered) {
+    for (size_t i = 0; i < points_number; i++)
+    {
+      LidarPointXYZIRT point = pPoints[i];
+      *iter_x_ = point.x;
+      *iter_y_ = point.y;
+      *iter_z_ = point.z;
+      *iter_intensity_ = point.intensity;
+      *iter_ring_ = point.ring;
+      *iter_timestamp_ = point.timestamp;
+      ++iter_x_;
+      ++iter_y_;
+      ++iter_z_;
+      ++iter_intensity_;
+      ++iter_ring_;
+      ++iter_timestamp_;   
+    }
+  } else {
+    // Copy and change column order to row order in one go
+    for (int row = 0; row < out_height; row++) {
+      for (int col = 0; col < out_width; col++) {
+        LidarPointXYZIRT point = pPoints[col * row_stride + row];
+        *iter_x_ = point.x;
+        *iter_y_ = point.y;
+        *iter_z_ = point.z;
+        *iter_intensity_ = point.intensity;
+        *iter_ring_ = point.ring;
+        *iter_timestamp_ = point.timestamp;
+        ++iter_x_;
+        ++iter_y_;
+        ++iter_z_;
+        ++iter_intensity_;
+        ++iter_ring_;
+        ++iter_timestamp_;   
+      }
+    }
   }
   // printf("HesaiLidar Runing Status [standby mode:%u]  |  [speed:%u]\n", frame.work_mode, frame.spin_speed);
-  printf("%s frame:%d points:%u packet:%d start time:%lf end time:%lf\n", prefix, frame_index, points_number, packet_number, frame_start_timestamp, frame_end_timestamp) ;
-  std::cout.flush();
+  // DEV-2505: Spamming the log. Only enable for debugging.
+  // printf("%s frame:%d points:%u packet:%d start time:%lf end time:%lf\n", prefix, frame_index, points_number, packet_number, frame_start_timestamp, frame_end_timestamp) ;
+  // std::cout.flush();
   auto sec = (uint64_t)floor(frame_start_timestamp);
   if (sec <= std::numeric_limits<int32_t>::max()) {
     ros_msg.header.stamp.sec = (uint32_t)floor(frame_start_timestamp);

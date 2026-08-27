@@ -1,7 +1,7 @@
 lidar:
   - driver:
       use_gpu: false
-      source_type: 2                                  # The type of data source, 1: real-time lidar connection, 2: pcap, 3: packet rosbag, 4: serial    
+      source_type: 1                                  # The type of data source, 1: real-time lidar connection, 2: pcap, 3: packet rosbag, 4: serial    
       # Depending on the type of source_type, fill in the corresponding configuration block (lidar_udp_type, pcap_type, serial_type)
       lidar_udp_type:
         device_ip_address: 192.168.1.201              # host_ip_address. If empty(""), the source ip of the udp point cloud is used
@@ -29,12 +29,12 @@ lidar:
         caFile: ""                                    # Represents the path of the CA certificate 
 
       pcap_type:
-        pcap_path: "ot128.pcap"
-        correction_file_path: "OT128_Angle-Correction-File.csv"
-        firetimes_path: "OT128_Firetime-Correction-File.csv"
+        pcap_path: "Your pcap file"                         # The path of pcap file
+        correction_file_path: "Your correction file path"   # The path of correction file
+        firetimes_path: "Your firetime file path"           # The path of firetimes file
 
         pcap_play_synchronization: true                     # pcap play rate synchronize with the host time
-        pcap_play_in_loop: true
+        pcap_play_in_loop: false
         play_rate_: 1.0                                     # pcap play rate 
       
       rosbag_type:
@@ -75,11 +75,10 @@ lidar:
       frame_frequency: 0                    # The frequency that point cloud sends.
       default_frame_frequency: 10.0         # The default frequency that point cloud sends.
       echo_mode_filter: 0                   # return mode filter
+
       remake_config:
-        enabled: true                      # Enable ordered grid output (upstream v2.0.12 angle-based remake).
-                                           # Grid dimensions use the SDK per-model defaults
-                                           # (OT128: 3600 x 320 = azimuth x elevation-angle bins).
-        echo_mode_filter: 1                 # 1=first return, 2=second return
+        enabled: true
+        use_ring_remake: true
 
     ros:
       ros_frame_id: hesai_lidar                           # Frame id of packet message and point cloud message
