@@ -39,6 +39,7 @@
 #include <hesai_ros_driver/msg/ptp.hpp>
 #include <hesai_ros_driver/msg/firetime.hpp>
 #include <hesai_ros_driver/msg/loss_packet.hpp>
+#include <hesai_ros_driver/msg/blockage_status.hpp>
 
 #include <fstream>
 #include <memory>
@@ -117,7 +118,7 @@ protected:
   rclcpp::Publisher<hesai_ros_driver::msg::Ptp>::SharedPtr ptp_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<hesai_ros_driver::msg::UdpPacket>::SharedPtr every_pkt_pub_;
-
+  rclcpp::Publisher<hesai_ros_driver::msg::BlockageStatus>::SharedPtr blockage_pub_;
   //spin thread while Receive data from ROS topic
   boost::thread* subscription_spin_thread_;
 };
@@ -129,6 +130,9 @@ inline void SourceDriver::Init(const YAML::Node& config)
   frame_id_ = driver_param.input_param.frame_id;
 
   node_ptr_.reset(new rclcpp::Node("hesai_ros_driver_node"));
+
+  blockage_pub_ = node_ptr_->create_publisher<hesai_ros_driver::msg::BlockageStatus>("hesai_blockage_status", 10);
+
   if (driver_param.input_param.send_point_cloud_ros) {
     pub_ = node_ptr_->create_publisher<sensor_msgs::msg::PointCloud2>(driver_param.input_param.ros_send_point_topic, 10);
   }
@@ -229,7 +233,60 @@ inline void SourceDriver::SendPacket(const UdpFrame_t& msg, double timestamp)
 
 inline void SourceDriver::SendPointCloud(const LidarDecodedFrame<LidarPointXYZIRT>& msg)
 {
-  pub_->publish(ToRosMsg(msg, frame_id_));
+  auto point_cloud_msg = ToRosMsg(msg, frame_id_);
+  
+  hesai_ros_driver::msg::BlockageStatus blockage_msg;
+  blockage_msg.header.stamp = point_cloud_msg.header.stamp;
+  blockage_msg.header.frame_id = frame_id_;
+  blockage_msg.sensor_model = msg.sensor_model;
+
+  blockage_msg.code_0_hits.fill(0);
+  blockage_msg.code_1_hits.fill(0);
+  blockage_msg.code_2_hits.fill(0);
+  blockage_msg.code_3_hits.fill(0);
+  blockage_msg.moderate_noise_hits.fill(0);
+  blockage_msg.high_noise_hits.fill(0);
+
+  // O(1) binning across the extracted diagnostics
+  for (const auto &b : msg.frame_blockages) {
+    if (b.channel >= 128)
+      continue; // Safety bounds check
+
+    // Diagnostic code binning (0-3)
+    switch (b.status_code) {
+    case 0:
+      blockage_msg.code_0_hits[b.channel]++;
+      break;
+    case 1:
+      blockage_msg.code_1_hits[b.channel]++;
+      break;
+    case 2:
+      blockage_msg.code_2_hits[b.channel]++;
+      break;
+    case 3:
+      blockage_msg.code_3_hits[b.channel]++;
+      break;
+    default:
+      break;
+    }
+
+    // JT128 Noise binning
+    if (b.noise_level >= 43) {
+      blockage_msg.high_noise_hits[b.channel]++;
+    } else if (b.noise_level >= 22) {
+      blockage_msg.moderate_noise_hits[b.channel]++;
+    }
+  }
+
+  // Publish diagnostic status on every scan
+  blockage_pub_->publish(blockage_msg);
+
+  // Clear the SDK buffer for the next scan frame
+  auto &mutable_frame = const_cast<LidarDecodedFrame<LidarPointXYZIRT> &>(msg);
+  mutable_frame.frame_blockages.clear();
+
+  // Publish standard point cloud
+  pub_->publish(point_cloud_msg);
 }
 
 inline void SourceDriver::SendCorrection(const u8Array_t& msg)

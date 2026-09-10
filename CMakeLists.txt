@@ -148,6 +148,7 @@ if($ENV{ROS_VERSION} MATCHES "2")
       "msg/msg_ros2/Firetime.msg"
       "msg/msg_ros2/Ptp.msg"
       "msg/msg_ros2/LossPacket.msg"
+      "msg/msg_ros2/BlockageStatus.msg"
       DEPENDENCIES builtin_interfaces std_msgs
     )
     ament_export_dependencies(rosidl_default_runtime)                 
