@@ -87,6 +87,11 @@ public:
         // Ring binning gives a 1-1 mapping between mesurements and grid meausrements
         // Angle binning needs a sparse grid with many empties, and still throw away many poinst (up to 40% for some sensors)
         YamlRead<bool>(driver_config["remake_config"], "use_ring_remake", driver_param.decoder_param.remake_config.use_ring_remake, true);
+        // --- Flasheye DEV-2744/DEV-2745: blockage / dirt sector counters ---
+        YamlRead<bool>(driver_config["blockage_config"], "enabled",   driver_param.decoder_param.blockage_config.flag,      false);
+        YamlRead<int>( driver_config["blockage_config"], "elev_bins", driver_param.decoder_param.blockage_config.elev_bins, 8);
+        YamlRead<int>( driver_config["blockage_config"], "azim_bins", driver_param.decoder_param.blockage_config.azim_bins, 32);
+        YamlRead<uint32_t>(driver_config["blockage_config"], "accumulate_frames", driver_param.input_param.blockage_accumulate_frames, 1);
 
         // OT128: rings outside the dense band sample azimuth at half rate, leaving every
         // other grid column empty. Back fill from the neighbour. Off by default.
@@ -101,6 +106,7 @@ public:
         YamlRead<bool>(       config["ros"], "send_packet_ros",            driver_param.input_param.send_packet_ros, false);
         YamlRead<bool>(       config["ros"], "send_point_cloud_ros",       driver_param.input_param.send_point_cloud_ros, false);
         YamlRead<bool>(       config["ros"], "send_imu_ros",               driver_param.input_param.send_imu_ros, false);
+        YamlRead<bool>(       config["ros"], "send_blockage_ros",          driver_param.input_param.send_blockage_ros, false);
         YamlRead<std::string>(config["ros"], "ros_frame_id",               driver_param.input_param.frame_id, "hesai_lidar");
         YamlRead<std::string>(config["ros"], "ros_send_packet_topic",      driver_param.input_param.ros_send_packet_topic, "hesai_packets");
         YamlRead<std::string>(config["ros"], "ros_send_point_cloud_topic", driver_param.input_param.ros_send_point_topic, "hesai_points");
@@ -111,6 +117,7 @@ public:
         YamlRead<std::string>(config["ros"], "ros_recv_correction_topic",  driver_param.input_param.ros_recv_correction_topic, NULL_TOPIC);  
         YamlRead<std::string>(config["ros"], "ros_send_imu_topic",         driver_param.input_param.ros_send_imu_topic, NULL_TOPIC);  
         YamlRead<std::string>(config["ros"], "ros_send_every_packet_topic",driver_param.input_param.ros_send_every_packet_topic, NULL_TOPIC);            
+        YamlRead<std::string>(config["ros"], "ros_send_blockage_topic",    driver_param.input_param.ros_send_blockage_topic, NULL_TOPIC);
         return true;
     }
 
