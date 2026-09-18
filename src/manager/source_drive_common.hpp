@@ -88,6 +88,13 @@ public:
         // Angle binning needs a sparse grid with many empties, and still throw away many poinst (up to 40% for some sensors)
         YamlRead<bool>(driver_config["remake_config"], "use_ring_remake", driver_param.decoder_param.remake_config.use_ring_remake, true);
 
+        // OT128: rings outside the dense band sample azimuth at half rate, leaving every
+        // other grid column empty. Back fill from the neighbour. Off by default.
+        // The band comes from the sensor's parser; -1 keeps that default.
+        YamlRead<bool>(driver_config["remake_config"], "duplicate_sparse_rings", driver_param.decoder_param.remake_config.duplicate_sparse_rings, false);
+        YamlRead<int>( driver_config["remake_config"], "dense_ring_start",       driver_param.decoder_param.remake_config.dense_ring_start, -1);
+        YamlRead<int>( driver_config["remake_config"], "dense_ring_end",         driver_param.decoder_param.remake_config.dense_ring_end, -1);
+
         // Do not use YamlRead<uint8_t>, Yaml cannot recognise uint8_t, There will be some unexpected values.
 
         // ROS related

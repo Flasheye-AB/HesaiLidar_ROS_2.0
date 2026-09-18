@@ -79,6 +79,7 @@ lidar:
       remake_config:
         enabled: true
         use_ring_remake: true
+        duplicate_sparse_rings: false   # OT128: back fill the half-rate outer rings (band comes from the sensor)
 
     ros:
       ros_frame_id: hesai_lidar                           # Frame id of packet message and point cloud message
