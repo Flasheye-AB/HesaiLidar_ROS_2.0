@@ -39,6 +39,7 @@
 #include <hesai_ros_driver/msg/ptp.hpp>
 #include <hesai_ros_driver/msg/firetime.hpp>
 #include <hesai_ros_driver/msg/loss_packet.hpp>
+#include <hesai_ros_driver/msg/blockage_status.hpp>
 
 #include <fstream>
 #include <memory>
@@ -65,6 +66,10 @@ public:
   std::shared_ptr<HesaiLidarSdk<LidarPointXYZIRT>> driver_ptr_;
   // Write config to log once for easier debugging
   bool logged_config_ = false;
+  // DEV-2744/DEV-2745: blockage report accumulator
+  hesai_ros_driver::msg::BlockageStatus blockage_msg_;
+  uint32_t blockage_frames_ = 0;          // frames counted into blockage_msg_
+  uint32_t blockage_window_ = 1;          // frames per published report
 protected:
   // Save Correction file subscribed by "ros_recv_correction_topic"
   void ReceiveCorrection(const std_msgs::msg::UInt8MultiArray::SharedPtr msg);
@@ -72,6 +77,9 @@ protected:
   void ReceivePacket(const hesai_ros_driver::msg::UdpFrame::SharedPtr msg);
   // Used to publish point clouds through 'ros_send_point_cloud_topic'
   void SendPointCloud(const LidarDecodedFrame<LidarPointXYZIRT>& msg);
+  // DEV-2744/DEV-2745: accumulate sector counters, publish every blockage_window_ frames
+  void SendBlockage(const LidarDecodedFrame<LidarPointXYZIRT>& msg,
+                    const std_msgs::msg::Header& cloud_header);
   // Used to publish the original packet through 'ros_send_packet_topic'
   void SendPacket(const UdpFrame_t& ros_msg, double timestamp);
 
@@ -117,7 +125,7 @@ protected:
   rclcpp::Publisher<hesai_ros_driver::msg::Ptp>::SharedPtr ptp_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<hesai_ros_driver::msg::UdpPacket>::SharedPtr every_pkt_pub_;
-
+  rclcpp::Publisher<hesai_ros_driver::msg::BlockageStatus>::SharedPtr blockage_pub_;
   //spin thread while Receive data from ROS topic
   boost::thread* subscription_spin_thread_;
 };
@@ -129,6 +137,15 @@ inline void SourceDriver::Init(const YAML::Node& config)
   frame_id_ = driver_param.input_param.frame_id;
 
   node_ptr_.reset(new rclcpp::Node("hesai_ros_driver_node"));
+
+  // DEV-2744/DEV-2745
+  if (driver_param.input_param.send_blockage_ros) {
+    blockage_pub_ = node_ptr_->create_publisher<hesai_ros_driver::msg::BlockageStatus>(
+        driver_param.input_param.ros_send_blockage_topic, 10);
+  }
+  blockage_window_ = driver_param.input_param.blockage_accumulate_frames;
+  if (blockage_window_ < 1) blockage_window_ = 1;
+
   if (driver_param.input_param.send_point_cloud_ros) {
     pub_ = node_ptr_->create_publisher<sensor_msgs::msg::PointCloud2>(driver_param.input_param.ros_send_point_topic, 10);
   }
@@ -175,7 +192,8 @@ inline void SourceDriver::Init(const YAML::Node& config)
   }
   driver_ptr_.reset(new HesaiLidarSdk<LidarPointXYZIRT>());
   driver_param.decoder_param.enable_parser_thread = true;
-  if (driver_param.input_param.send_point_cloud_ros) {
+  // DEV-2744/DEV-2745
+  if (driver_param.input_param.send_point_cloud_ros || driver_param.input_param.send_blockage_ros) {
     driver_ptr_->RegRecvCallback([this](const hesai::lidar::LidarDecodedFrame<hesai::lidar::LidarPointXYZIRT>& frame) {  
       this->SendPointCloud(frame);  
     });  
@@ -229,7 +247,66 @@ inline void SourceDriver::SendPacket(const UdpFrame_t& msg, double timestamp)
 
 inline void SourceDriver::SendPointCloud(const LidarDecodedFrame<LidarPointXYZIRT>& msg)
 {
-  pub_->publish(ToRosMsg(msg, frame_id_));
+  auto point_cloud_msg = ToRosMsg(msg, frame_id_);
+  // Publish standard point cloud
+  if(pub_) pub_->publish(point_cloud_msg);
+  // DEV-2744/DEV-2745
+  if (blockage_pub_ && msg.blockage.ready) SendBlockage(msg, point_cloud_msg.header);
+}  
+
+// DEV-2744/DEV-2745
+// The SDK counts per frame and clears itself; rate and interpretation live here.
+inline void SourceDriver::SendBlockage(const LidarDecodedFrame<LidarPointXYZIRT>& msg,
+                                       const std_msgs::msg::Header& cloud_header)
+{
+  const auto& b = msg.blockage;
+  const size_t n = b.samples.size();
+
+  // Clear accumulators
+  if (blockage_frames_ == 0) {          // start of an accumulation window
+    blockage_msg_.n_elev_bins  = b.elev_bins;
+    blockage_msg_.n_azim_bins  = b.azim_bins;
+    blockage_msg_.elev_min_deg = b.elev_min;
+    blockage_msg_.elev_max_deg = b.elev_max;
+    blockage_msg_.samples.assign(n, 0);
+    blockage_msg_.code_0_hits.assign(n, 0);
+    blockage_msg_.code_1_hits.assign(n, 0);
+    blockage_msg_.code_2_hits.assign(n, 0);
+    blockage_msg_.code_3_hits.assign(n, 0);
+    blockage_msg_.moderate_noise_hits.assign(n, 0);
+    blockage_msg_.high_noise_hits.assign(n, 0);
+  }
+  // Add current frames counts to accumulators
+  for (size_t i = 0; i < n; i++) {
+    blockage_msg_.samples[i]             += b.samples[i];
+    blockage_msg_.code_0_hits[i]         += b.code_hits[0][i];
+    blockage_msg_.code_1_hits[i]         += b.code_hits[1][i];
+    blockage_msg_.code_2_hits[i]         += b.code_hits[2][i];
+    blockage_msg_.code_3_hits[i]         += b.code_hits[3][i];
+    blockage_msg_.moderate_noise_hits[i] += b.noise_hits[0][i];
+    blockage_msg_.high_noise_hits[i]     += b.noise_hits[1][i];
+  }
+
+  if (++blockage_frames_ < blockage_window_) return; // Limit message rate based on blockage_window_
+
+  // If we have accumulated enough frames and it's time to publish, build the message and publish
+
+  blockage_msg_.sensor_model = b.sensor_type;
+
+  // JT128 reports the contamination level unconditionally. 
+  // OT128 only reports when the feature is on. 
+  // Code 3 should only happen if the feature is on so we use that to detect if it's on.
+  bool code3_seen = false;
+  for (size_t i = 0; i < n; i++) {
+    if (blockage_msg_.code_3_hits[i] > 0) { code3_seen = true; break; }
+  }
+  blockage_msg_.detection_enabled = (b.sensor_type == "OT128") ? code3_seen : true;
+
+  blockage_msg_.header.stamp = cloud_header.stamp;
+  blockage_msg_.header.frame_id = frame_id_;
+  blockage_msg_.frames_accumulated = blockage_frames_;
+  blockage_pub_->publish(blockage_msg_);
+  blockage_frames_ = 0;
 }
 
 inline void SourceDriver::SendCorrection(const u8Array_t& msg)
